@@ -65,11 +65,11 @@ class Storage {
     return size
   }
 
-  private static func fileSize(at url: URL) -> Int64? {
+  nonisolated private static func fileSize(at url: URL) -> Int64? {
     try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize.map(Int64.init)
   }
 
-  private static func compactDatabase(at url: URL) throws {
+  nonisolated private static func compactDatabase(at url: URL) throws {
     var database: OpaquePointer?
     guard sqlite3_open_v2(url.path, &database, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK else {
       let message = database.flatMap { sqlite3_errmsg($0) }.map { String(cString: $0) } ?? "Unable to open database."
@@ -88,7 +88,7 @@ class Storage {
     try execute(database, statement: "VACUUM;")
   }
 
-  private static func execute(_ database: OpaquePointer?, statement: String) throws {
+  nonisolated private static func execute(_ database: OpaquePointer?, statement: String) throws {
     guard sqlite3_exec(database, statement, nil, nil, nil) == SQLITE_OK else {
       let message = database.flatMap { sqlite3_errmsg($0) }.map { String(cString: $0) } ?? "Database operation failed."
       throw CompactError.execute(statement, message)
