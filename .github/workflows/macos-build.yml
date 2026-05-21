@@ -1,0 +1,48 @@
+name: macOS Build
+
+on:
+  push:
+    branches:
+      - master
+      - "codex/**"
+    paths:
+      - ".github/workflows/macos-build.yml"
+      - "Maccy/**"
+      - "Maccy.xcodeproj/**"
+      - "MaccyTests/**"
+      - "MaccyUITests/**"
+  pull_request:
+    paths:
+      - ".github/workflows/macos-build.yml"
+      - "Maccy/**"
+      - "Maccy.xcodeproj/**"
+      - "MaccyTests/**"
+      - "MaccyUITests/**"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Select latest stable Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Build Maccy
+        run: |
+          xcodebuild \
+            -project Maccy.xcodeproj \
+            -scheme Maccy \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build

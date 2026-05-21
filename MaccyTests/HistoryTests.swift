@@ -233,6 +233,18 @@ class HistoryTests: XCTestCase {
     XCTAssertEqual(history.items, [bar])
   }
 
+  func testDeletingItemRemovesContentsFromStorage() throws {
+    let item = history.add(historyItem("foo"))
+
+    history.delete(item)
+
+    let historyItemCount = try Storage.shared.context.fetchCount(FetchDescriptor<HistoryItem>())
+    let contentCount = try Storage.shared.context.fetchCount(FetchDescriptor<HistoryItemContent>())
+
+    XCTAssertEqual(historyItemCount, 0)
+    XCTAssertEqual(contentCount, 0)
+  }
+
   private func historyItem(_ value: String) -> HistoryItem {
     let contents = [
       HistoryItemContent(
