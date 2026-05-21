@@ -9,7 +9,7 @@ class Storage {
   var container: ModelContainer
   var context: ModelContext { container.mainContext }
   var size: String {
-    guard let size = Self.fileSize(at: url), size > 1 else {
+    guard let size = fileSize(at: url), size > 1 else {
       return ""
     }
 
@@ -59,53 +59,53 @@ class Storage {
 
     let databaseURL = url
     try await Task.detached(priority: .utility) {
-      try Self.compactDatabase(at: databaseURL)
+      try compactStorageDatabase(at: databaseURL)
     }.value
 
     return size
   }
+}
 
-  nonisolated private static func fileSize(at url: URL) -> Int64? {
-    try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize.map(Int64.init)
+private func compactStorageDatabase(at url: URL) throws {
+  var database: OpaquePointer?
+  guard sqlite3_open_v2(url.path, &database, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK else {
+    let message = database.flatMap { sqlite3_errmsg($0) }.map { String(cString: $0) } ?? "Unable to open database."
+    sqlite3_close(database)
+    throw StorageCompactError.openDatabase(message)
   }
 
-  nonisolated private static func compactDatabase(at url: URL) throws {
-    var database: OpaquePointer?
-    guard sqlite3_open_v2(url.path, &database, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK else {
-      let message = database.flatMap { sqlite3_errmsg($0) }.map { String(cString: $0) } ?? "Unable to open database."
-      sqlite3_close(database)
-      throw CompactError.openDatabase(message)
-    }
-
-    defer {
-      sqlite3_close(database)
-    }
-
-    sqlite3_busy_timeout(database, 5_000)
-
-    try execute(database, statement: "PRAGMA wal_checkpoint(TRUNCATE);")
-    try execute(database, statement: "DELETE FROM ZHISTORYITEMCONTENT WHERE ZITEM IS NULL;")
-    try execute(database, statement: "VACUUM;")
+  defer {
+    sqlite3_close(database)
   }
 
-  nonisolated private static func execute(_ database: OpaquePointer?, statement: String) throws {
-    guard sqlite3_exec(database, statement, nil, nil, nil) == SQLITE_OK else {
-      let message = database.flatMap { sqlite3_errmsg($0) }.map { String(cString: $0) } ?? "Database operation failed."
-      throw CompactError.execute(statement, message)
-    }
+  sqlite3_busy_timeout(database, 5_000)
+
+  try executeSQLite(database, statement: "PRAGMA wal_checkpoint(TRUNCATE);")
+  try executeSQLite(database, statement: "DELETE FROM ZHISTORYITEMCONTENT WHERE ZITEM IS NULL;")
+  try executeSQLite(database, statement: "VACUUM;")
+}
+
+private func executeSQLite(_ database: OpaquePointer?, statement: String) throws {
+  guard sqlite3_exec(database, statement, nil, nil, nil) == SQLITE_OK else {
+    let message = database.flatMap { sqlite3_errmsg($0) }.map { String(cString: $0) } ?? "Database operation failed."
+    throw StorageCompactError.execute(statement, message)
   }
+}
 
-  enum CompactError: LocalizedError {
-    case openDatabase(String)
-    case execute(String, String)
+private func fileSize(at url: URL) -> Int64? {
+  try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize.map(Int64.init)
+}
 
-    var errorDescription: String? {
-      switch self {
-      case let .openDatabase(message):
-        return message
-      case let .execute(statement, message):
-        return "\(statement) \(message)"
-      }
+private enum StorageCompactError: LocalizedError {
+  case openDatabase(String)
+  case execute(String, String)
+
+  var errorDescription: String? {
+    switch self {
+    case let .openDatabase(message):
+      return message
+    case let .execute(statement, message):
+      return "\(statement) \(message)"
     }
   }
 }
