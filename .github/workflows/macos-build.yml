@@ -5,6 +5,7 @@ on:
     branches:
       - master
       - "codex/**"
+      - "fix/**"
     paths:
       - ".github/workflows/macos-build.yml"
       - "Maccy/**"
@@ -46,3 +47,21 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             build
+
+      - name: Package Maccy.app
+        run: |
+          APP_PATH="$(find "$HOME/Library/Developer/Xcode/DerivedData" -path '*/Build/Products/Debug/Maccy.app' -print -quit)"
+          if [ -z "$APP_PATH" ]; then
+            echo "Unable to find built Maccy.app" >&2
+            exit 1
+          fi
+
+          mkdir -p dist
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "dist/Maccy-${{ github.run_number }}.zip"
+
+      - name: Upload Maccy artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Maccy-app-${{ github.run_number }}
+          path: dist/Maccy-${{ github.run_number }}.zip
+          if-no-files-found: error
